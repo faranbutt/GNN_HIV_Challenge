@@ -50,31 +50,16 @@ jobs:
         echo "submission_file=$SUB" >> $GITHUB_OUTPUT
         echo "Found submission: $SUB"
 
-    - name: Score Submission
-      id: scoring
-      run: |
-        # 1. Run scoring script and save ALL output (stdout and stderr) to output.txt
-        # We use '|| true' to prevent the step from crashing immediately if Python fails
-        python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.txt 2>&1 || true
-        
-        # 2. Print the output to the GitHub console so we can debug errors
-        echo "::group::Script Output"
-        cat output.txt
-        echo "::endgroup::"
-        
-        # 3. Try to extract the score
-        SCORE=$(grep -oP '"roc_auc":\s*\K[\d.]+' output.txt || echo "")
-        
-        # 4. Check if score was found. If not, fail with a clear message.
-        if [ -z "$SCORE" ]; then
-          echo "❌ Error: Could not extract 'roc_auc' from output."
-          echo "See the 'Script Output' above for the Python error traceback."
-          exit 1
-        fi
-        
-        # 5. Success! Set environment variables
-        echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
-        echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
+    - name: Commit & Push Updated Leaderboard
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        # This line is the magic fix:
+        token: ${{ secrets.ACTION_TOKEN }} 
+        commit_message: "Update leaderboard via GitHub Actions [skip ci]"
+        branch: main
+        file_pattern: "leaderboard.md leaderboard.csv leaderboard.html README.md"
+        commit_user_name: "GNN Challenge Bot"
+        commit_user_email: "bot@example.com"
 
     - name: Comment on PR
       if: github.event_name == 'pull_request'
