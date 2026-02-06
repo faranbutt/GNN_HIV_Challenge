@@ -155,12 +155,6 @@ This process will:
 ## 🏆 Leaderboard
 
 <!-- LEADERBOARD-START -->
-
-| Rank | User | Submission File | ROC-AUC | Date |
-|------|------|----------------|---------|------|
-| 1 | faranbutt | submissions/default.csv | 0.4747 | 2026-01-16 |
-| 2 | faranbutt | submissions/default.csv | 0.0000 | 2026-02-06 |
-
 <!-- LEADERBOARD-END -->
 
 ## 📁 Repository Structure
