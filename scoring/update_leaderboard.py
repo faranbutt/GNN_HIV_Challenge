@@ -13,6 +13,18 @@ readme_file = 'README.md'
 
 def generate_html_content(df):
     """ Generates clean HTML for the leaderboard """
+    rows_html = ""
+    for _, row in df.iterrows():
+        rank_class = "top-1" if int(row['Rank']) == 1 else ""
+        rows_html += f"""
+                <tr class="{rank_class}">
+                    <td>{row['Rank']}</td>
+                    <td>{row['User']}</td>
+                    <td>{row['Submission File']}</td>
+                    <td>{float(row['ROC-AUC']):.4f}</td>
+                    <td>{row['Date']}</td>
+                </tr>"""
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,20 +57,7 @@ def generate_html_content(df):
                     <th>Date</th>
                 </tr>
             </thead>
-            <tbody>"""
-
-    for _, row in df.iterrows():
-        rank_class = "top-1" if int(row['Rank']) == 1 else ""
-        html_content += f"""
-                <tr class="{rank_class}">
-                    <td>{row['Rank']}</td>
-                    <td>{row['User']}</td>
-                    <td>{row['Submission File']}</td>
-                    <td>{float(row['ROC-AUC']):.4f}</td>
-                    <td>{row['Date']}</td>
-                </tr>"""
-
-    html_content += f"""
+            <tbody>{rows_html}
             </tbody>
         </table>
         <div class="footer">
@@ -101,7 +100,7 @@ leaderboard.to_csv(leaderboard_csv, index=False)
 with open(leaderboard_html, 'w', encoding='utf-8') as f:
     f.write(generate_html_content(leaderboard))
 
-# 4. Update README.md (FIXED REGEX)
+# 4. Update README.md
 table_md = "| Rank | User | Submission File | ROC-AUC | Date |\n|------|------|----------------|---------|------|\n"
 for _, row in leaderboard.iterrows():
     table_md += f"| {row['Rank']} | {row['User']} | {row['Submission File']} | {float(row['ROC-AUC']):.4f} | {row['Date']} |\n"
@@ -110,7 +109,7 @@ if os.path.exists(readme_file):
     with open(readme_file, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    # THE CRITICAL FIX: Named markers
+    # FIX: Explicit markers used for matching
     pattern = r'.*?'
     replacement = f'\n\n{table_md}\n'
     
@@ -120,4 +119,4 @@ if os.path.exists(readme_file):
             f.write(new_content)
         print("README updated successfully.")
     else:
-        print("Markers not found in README. Make sure exists!")
+        print("Markers not found in README!")
