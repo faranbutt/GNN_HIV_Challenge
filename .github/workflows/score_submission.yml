@@ -1,0 +1,100 @@
+name: Score Submission
+
+permissions:
+  contents: write   
+  pull-requests: write
+
+on:
+  pull_request:
+    paths:
+      - 'submissions/*.csv'
+  push:
+    paths:
+      - 'submissions/*.csv'
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Download Private Data
+      env:
+        PRIVATE_DATA_URL: ${{ secrets.DEFAULT_URL }}
+      run: |
+        python scripts/download_private_data.py
+
+    - name: Find Submission File
+      id: find_submission
+      run: |
+        # Find CSV files in submissions folder
+        SUB=$(ls submissions/*.csv 2>/dev/null | head -n 1)
+        if [ -z "$SUB" ]; then
+          echo "No submission found."
+          exit 1
+        fi
+        echo "submission_file=$SUB" >> $GITHUB_OUTPUT
+        echo "Found submission: $SUB"
+
+    - name: Score Submission
+      id: scoring
+      run: |
+        # Run scoring script with JSON flag
+        python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.txt
+        
+        # Parse score from JSON output
+        SCORE=$(grep -oP '"roc_auc":\s*\K[\d.]+' output.txt)
+        
+        # Set environment variables for next steps
+        echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
+        echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
+        
+        # Print results for logs
+        cat output.txt
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const score = process.env.PR_SCORE;
+          const file = process.env.PR_SUBMISSION;
+          const body = `## 📊 Evaluation Results\n\n**Metric:** ROC-AUC\n**Score:** ${score}\n\n📁 File: ${file}\n\nThe leaderboard will be updated shortly.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+    - name: Update Leaderboard
+      run: |
+        python scoring/update_leaderboard.py
+      env:
+        PR_USER: ${{ github.actor }}
+        PR_SUBMISSION: ${{ env.PR_SUBMISSION }}
+        PR_SCORE: ${{ env.PR_SCORE }}
+
+    - name: Commit & Push Updated Leaderboard
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Update leaderboard via GitHub Actions [skip ci]"
+        branch: main
+        file_pattern: "leaderboard.md leaderboard.csv leaderboard.html README.md"
+        commit_user_name: "GNN Challenge Bot"
+        commit_user_email: "bot@example.com"
