@@ -28,5 +28,6 @@ uv.lock
 /.kaggle/
 check_data.py
 generate_data.py
-data/raw/graph-label.csv.gz
 models/
+datasets/ogbg_molhiv/raw/graph-label.csv.gz
+datasets/ogbg_molhiv/split/scaffold/test.csv.gz
