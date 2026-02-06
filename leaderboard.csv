@@ -1,3 +1,4 @@
 Rank,User,Submission File,ROC-AUC,Date
 1,faranbutt,submissions/default.csv,0.4747487102543611,2026-01-16
 2,faranbutt,submissions/default.csv,0.0,2026-02-06
+3,faranbutt,submissions/ogb_submission_gcn.csv,0.0,2026-02-06
