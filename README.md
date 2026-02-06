@@ -155,11 +155,6 @@ This process will:
 ## 🏆 Leaderboard
 
 <!-- LEADERBOARD-START -->
-
-| Rank | User | Submission File | ROC-AUC | Date |
-|------|------|----------------|---------|------|
-| 1 | faranbutt | submissions/default.csv | 0.4747 | 2026-01-16 |
-
 <!-- LEADERBOARD-END -->
 
 ## 📁 Repository Structure
@@ -198,3 +193,4 @@ This process will:
 ## Refrences
 - [Basira Lab Deep Graph Learning Playlist](https://www.youtube.com/watch?v=gQRV_jUyaDw&list=PLug43ldmRSo14Y_vt7S6vanPGh-JpHR7T)
 - [Basira Lab Deep Graph Learning Github](https://github.com/basiralab/DGL)
+
