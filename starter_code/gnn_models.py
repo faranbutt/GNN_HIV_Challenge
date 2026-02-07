@@ -27,7 +27,7 @@ class GATGNN(nn.Module):
         self.fc = nn.Linear(hidden, 1)
 
     def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x, edge_index, batch = data.x.float(), data.edge_index, data.batch
         x = F.elu(self.conv1(x, edge_index))
         x = F.elu(self.conv2(x, edge_index))
         x = global_mean_pool(x, batch)
