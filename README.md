@@ -43,19 +43,20 @@ The workflow will handle private data during scoring, but for local training, th
 
 ```bash
 python scripts/download_private_data.py
-3. Training the Baselines
-We provide standardized starter code using the PygGraphPropPredDataset module.
 ```
+### 3. Training the Baselines
+We provide standardized starter code using the PygGraphPropPredDataset module.
 
-# GCN (Graph Convolutional Network)
+
+### GCN (Graph Convolutional Network)
 ```python
 python starter_code/train.py --model gcn --epochs 20
 ```
-# GIN (Graph Isomorphism Network)
+### GIN (Graph Isomorphism Network)
 ```python
 python starter_code/train.py --model gin --epochs 20
 ```
-# GAT (Graph Attention Network)
+### GAT (Graph Attention Network)
 ```python
 python starter_code/train.py --model gat --epochs 20
 ```
