@@ -34,7 +34,7 @@
 #notebook>=6.5,<7
 #ipywidgets>=8.1,<9
 #ogb>=1.3.6
-#tabulate
+tabulate
 
 
 pandas
