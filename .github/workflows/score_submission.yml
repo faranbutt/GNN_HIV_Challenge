@@ -21,7 +21,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
-        # Use token here to ensure the check-out has permissions to push back later
         token: ${{ secrets.ACTION_TOKEN }}
 
     - name: Set up Python
@@ -39,17 +38,7 @@ jobs:
         PRIVATE_DATA_URL: ${{ secrets.DEFAULT_URL }}
       run: |
         python scripts/download_private_data.py
-
-    # - name: Find Submission File
-    #   id: find_submission
-    #   run: |
-    #     SUB=$(ls submissions/*.csv 2>/dev/null | head -n 1)
-    #     if [ -z "$SUB" ]; then
-    #       echo "No submission found."
-    #       exit 1
-    #     fi
-    #     echo "submission_file=$SUB" >> $GITHUB_OUTPUT
-    #     echo "Found submission: $SUB"
+        
     - name: Find Submission File
       id: find_submission
       run: |
@@ -69,7 +58,7 @@ jobs:
         
         echo "submission_file=$SUB" >> $GITHUB_OUTPUT
         echo "Found submission: $SUB"
-        
+
     - name: Score Submission
       id: scoring
       run: |
@@ -104,7 +93,6 @@ jobs:
     - name: Comment on PR
       if: github.event_name == 'pull_request'
       env:
-        # Re-mapping env vars for the script context
         SCORE: ${{ env.PR_SCORE }}
         FILE: ${{ env.PR_SUBMISSION }}
       uses: actions/github-script@v6
@@ -124,7 +112,6 @@ jobs:
     - name: Commit & Push Updated Leaderboard
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        # Use the PAT token to trigger the GitHub Pages build workflow
         token: ${{ secrets.ACTION_TOKEN }}
         commit_message: "Update leaderboard [skip ci]"
         branch: main
