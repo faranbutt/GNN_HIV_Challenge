@@ -17,104 +17,118 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.ACTION_TOKEN }}
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.ACTION_TOKEN }}
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install Dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Download Private Data (Hidden)
-      env:
-        PRIVATE_LABEL_URL: ${{ secrets.PRIVATE_LABEL_URL }}
-        PRIVATE_TEST_IDX_URL: ${{ secrets.PRIVATE_TEST_IDX_URL }}
-      run: |
-        python scripts/download_private_data.py
-        
-    - name: Find Submission File
-      id: find_submission
-      run: |
-        # List files changed in the last commit within submissions/
-        SUB=$(git diff --name-only HEAD^ HEAD | grep 'submissions/.*\.csv$' | head -n 1)
-        
-        # Fallback for first commit or direct pushes
-        if [ -z "$SUB" ]; then
-          SUB=$(ls -t submissions/*.csv 2>/dev/null | head -n 1)
-        fi
+      - name: Ensure submissions folder exists
+        run: |
+          if [ ! -d "submissions" ]; then
+            echo "❌ submissions/ folder missing. This repo is misconfigured."
+            exit 1
+          fi
 
-        if [ -z "$SUB" ]; then
-          echo "No submission found."
-          exit 1
-        fi
-        
-        echo "submission_file=$SUB" >> $GITHUB_OUTPUT
-        echo "Found submission: $SUB"
+      - name: Download Private Test Data (Hidden)
+        env:
+          PRIVATE_LABEL_URL: ${{ secrets.PRIVATE_LABEL_URL }}
+          PRIVATE_TEST_IDX_URL: ${{ secrets.PRIVATE_TEST_IDX_URL }}
+        run: |
+          python scripts/download_private_data.py
 
-    - name: Score Submission
-      id: scoring
-      run: |
-        # 1. Run scoring script
-        # Note: Ensure scoring_script.py looks for labels in 'datasets/ogbg_molhiv/raw'
-        python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.txt 2>&1 || true
-        
-        echo "::group::Script Output"
-        cat output.txt
-        echo "::endgroup::"
-        
-        # 2. Extract ROC-AUC score
-        SCORE=$(grep -oP '"roc_auc":\s*\K[\d.]+' output.txt || echo "")
-        
-        if [ -z "$SCORE" ]; then
-          echo "❌ Error: Could not extract 'roc_auc' from output. Check scoring script logs."
-          exit 1
-        fi
-        
-        # 3. Set Env Variables for next steps
-        echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
-        echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
+      - name: Find Submission File (Only from this commit)
+        id: find_submission
+        run: |
+          echo "🔍 Finding submission from current commit..."
 
-    - name: Update Leaderboard Files
-      run: |
-        python scoring/update_leaderboard.py
-      env:
-        PR_USER: ${{ github.actor }}
-        PR_SUBMISSION: ${{ env.PR_SUBMISSION }}
-        PR_SCORE: ${{ env.PR_SCORE }}
+          SUB=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^submissions/.*\.csv$' | head -n 1)
 
-    - name: Comment on PR
-      if: github.event_name == 'pull_request'
-      env:
-        SCORE: ${{ env.PR_SCORE }}
-        FILE: ${{ env.PR_SUBMISSION }}
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const score = process.env.SCORE;
-          const file = process.env.FILE;
-          const body = `## 📊 Evaluation Results\n\n**Metric:** ROC-AUC\n**Score:** ${score}\n\n📁 File: ${file}\n\nThe leaderboard has been updated! View it [here](https://${context.repo.owner}.github.io/${context.repo.repo}/leaderboard.html).`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
+          if [ -z "$SUB" ]; then
+            echo "❌ No submission CSV found in this commit."
+            exit 1
+          fi
 
-    - name: Commit & Push Updated Leaderboard
-      uses: stefanzweifel/git-auto-commit-action@v4
-      with:
-        token: ${{ secrets.ACTION_TOKEN }}
-        commit_message: "Update leaderboard [skip ci]"
-        branch: main
-        file_pattern: "leaderboard.md leaderboard.csv leaderboard.html README.md"
-        commit_user_name: "GNN Challenge Bot"
-        commit_user_email: "bot@example.com"
+          echo "submission_file=$SUB" >> $GITHUB_OUTPUT
+          echo "✅ Found submission: $SUB"
+
+      - name: Score Submission
+        id: scoring
+        run: |
+          echo "🧪 Running scoring script..."
+
+          python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.json
+
+          echo "📄 Raw scoring output:"
+          cat output.json
+
+          python - <<EOF
+import json, sys
+with open("output.json") as f:
+    data = json.load(f)
+
+score = float(data.get("roc_auc", 0))
+
+if score <= 0:
+    print("❌ Invalid ROC-AUC score:", score)
+    sys.exit(1)
+
+print("✅ ROC-AUC:", score)
+
+with open("score.txt", "w") as f:
+    f.write(str(score))
+EOF
+
+      - name: Export Score
+        run: |
+          SCORE=$(cat score.txt)
+          echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
+          echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
+
+      - name: Update Leaderboard
+        run: |
+          python scoring/update_leaderboard.py
+        env:
+          PR_USER: ${{ github.actor }}
+          PR_SUBMISSION: ${{ env.PR_SUBMISSION }}
+          PR_SCORE: ${{ env.PR_SCORE }}
+
+      - name: Commit & Push Leaderboard
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          token: ${{ secrets.ACTION_TOKEN }}
+          commit_message: "Update leaderboard [skip ci]"
+          branch: main
+          file_pattern: "leaderboard.csv leaderboard.md leaderboard.html"
+          commit_user_name: "GNN Challenge Bot"
+          commit_user_email: "bot@gnnchallenge.ai"
+
+      - name: Comment on Pull Request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        env:
+          SCORE: ${{ env.PR_SCORE }}
+          FILE: ${{ env.PR_SUBMISSION }}
+        with:
+          script: |
+            const score = process.env.SCORE;
+            const file = process.env.FILE;
+
+            const body = `## 🧪 Submission Evaluated\n\n**File:** \`${file}\`\n**ROC-AUC:** **${score}**\n\n🏆 The leaderboard has been updated.\n👉 View: https://${context.repo.owner}.github.io/${context.repo.repo}/leaderboard.html`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
