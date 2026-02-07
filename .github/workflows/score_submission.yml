@@ -40,17 +40,36 @@ jobs:
       run: |
         python scripts/download_private_data.py
 
+    # - name: Find Submission File
+    #   id: find_submission
+    #   run: |
+    #     SUB=$(ls submissions/*.csv 2>/dev/null | head -n 1)
+    #     if [ -z "$SUB" ]; then
+    #       echo "No submission found."
+    #       exit 1
+    #     fi
+    #     echo "submission_file=$SUB" >> $GITHUB_OUTPUT
+    #     echo "Found submission: $SUB"
     - name: Find Submission File
       id: find_submission
       run: |
-        SUB=$(ls submissions/*.csv 2>/dev/null | head -n 1)
+        # Use git to list files changed in the last commit that are in submissions/ and end in .csv
+        # --diff-filter=AM means Added or Modified
+        SUB=$(git diff --name-only HEAD^ HEAD | grep 'submissions/.*\.csv$' | head -n 1)
+        
+        # Fallback: If git diff fails (e.g., first commit), use the most recent file by time
+        if [ -z "$SUB" ]; then
+          SUB=$(ls -t submissions/*.csv 2>/dev/null | head -n 1)
+        fi
+
         if [ -z "$SUB" ]; then
           echo "No submission found."
           exit 1
         fi
+        
         echo "submission_file=$SUB" >> $GITHUB_OUTPUT
         echo "Found submission: $SUB"
-
+        
     - name: Score Submission
       id: scoring
       run: |
