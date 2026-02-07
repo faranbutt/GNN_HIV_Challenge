@@ -33,20 +33,20 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Download Private Data
+    - name: Download Private Data (Hidden)
       env:
-        PRIVATE_DATA_URL: ${{ secrets.DEFAULT_URL }}
+        PRIVATE_LABEL_URL: ${{ secrets.PRIVATE_LABEL_URL }}
+        PRIVATE_TEST_IDX_URL: ${{ secrets.PRIVATE_TEST_IDX_URL }}
       run: |
         python scripts/download_private_data.py
         
     - name: Find Submission File
       id: find_submission
       run: |
-        # Use git to list files changed in the last commit that are in submissions/ and end in .csv
-        # --diff-filter=AM means Added or Modified
+        # List files changed in the last commit within submissions/
         SUB=$(git diff --name-only HEAD^ HEAD | grep 'submissions/.*\.csv$' | head -n 1)
         
-        # Fallback: If git diff fails (e.g., first commit), use the most recent file by time
+        # Fallback for first commit or direct pushes
         if [ -z "$SUB" ]; then
           SUB=$(ls -t submissions/*.csv 2>/dev/null | head -n 1)
         fi
@@ -62,28 +62,28 @@ jobs:
     - name: Score Submission
       id: scoring
       run: |
-        # 1. Run scoring and capture output
+        # 1. Run scoring script
+        # Note: Ensure scoring_script.py looks for labels in 'datasets/ogbg_molhiv/raw'
         python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.txt 2>&1 || true
         
         echo "::group::Script Output"
         cat output.txt
         echo "::endgroup::"
         
-        # 2. Extract score using Regex
+        # 2. Extract ROC-AUC score
         SCORE=$(grep -oP '"roc_auc":\s*\K[\d.]+' output.txt || echo "")
         
         if [ -z "$SCORE" ]; then
-          echo "❌ Error: Could not extract 'roc_auc' from output."
+          echo "❌ Error: Could not extract 'roc_auc' from output. Check scoring script logs."
           exit 1
         fi
         
-        # 3. SET ENV VARIABLES (Crucial: these are available to ALL subsequent steps)
+        # 3. Set Env Variables for next steps
         echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
         echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
 
     - name: Update Leaderboard Files
       run: |
-        # We pass the env vars explicitly to the python script
         python scoring/update_leaderboard.py
       env:
         PR_USER: ${{ github.actor }}
