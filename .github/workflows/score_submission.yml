@@ -4,6 +4,11 @@ permissions:
   contents: write
   pull-requests: write
 
+# Prevent multiple workflows from writing to the leaderboard simultaneously
+concurrency:
+  group: leaderboard-update
+  cancel-in-progress: false
+
 on:
   pull_request:
     paths:
@@ -43,10 +48,10 @@ jobs:
     - name: Find Submission File
       id: find_submission
       run: |
-        # List files changed in the last commit within submissions/
-        SUB=$(git diff --name-only HEAD^ HEAD | grep 'submissions/.*\.csv$' | head -n 1)
+        # Identify the exact CSV added in this push
+        SUB=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | grep 'submissions/.*\.csv$' | head -n 1)
         
-        # Fallback for first commit or direct pushes
+        # Fallback to the latest modified file if diff-tree is empty
         if [ -z "$SUB" ]; then
           SUB=$(ls -t submissions/*.csv 2>/dev/null | head -n 1)
         fi
@@ -62,28 +67,29 @@ jobs:
     - name: Score Submission
       id: scoring
       run: |
-        # 1. Run scoring script
-        # Note: Ensure scoring_script.py looks for labels in 'datasets/ogbg_molhiv/raw'
+        # Run scoring script and generate JSON output
         python scoring/scoring_script.py ${{ steps.find_submission.outputs.submission_file }} --json > output.txt 2>&1 || true
         
         echo "::group::Script Output"
         cat output.txt
         echo "::endgroup::"
         
-        # 2. Extract ROC-AUC score
+        # Extract ROC-AUC score
         SCORE=$(grep -oP '"roc_auc":\s*\K[\d.]+' output.txt || echo "")
         
         if [ -z "$SCORE" ]; then
-          echo "❌ Error: Could not extract 'roc_auc' from output. Check scoring script logs."
+          echo "❌ Error: Could not extract 'roc_auc' from output."
           exit 1
         fi
         
-        # 3. Set Env Variables for next steps
         echo "PR_SCORE=$SCORE" >> $GITHUB_ENV
         echo "PR_SUBMISSION=${{ steps.find_submission.outputs.submission_file }}" >> $GITHUB_ENV
 
     - name: Update Leaderboard Files
       run: |
+        # Configure git so the script can perform a pull if needed
+        git config --global user.name "GNN Challenge Bot"
+        git config --global user.email "bot@example.com"
         python scoring/update_leaderboard.py
       env:
         PR_USER: ${{ github.actor }}
@@ -113,8 +119,6 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         token: ${{ secrets.ACTION_TOKEN }}
-        commit_message: "Update leaderboard [skip ci]"
+        commit_message: "Update leaderboard for ${{ github.actor }} [skip ci]"
         branch: main
         file_pattern: "leaderboard.md leaderboard.csv leaderboard.html README.md"
-        commit_user_name: "GNN Challenge Bot"
-        commit_user_email: "bot@example.com"
