@@ -1,4 +1,6 @@
 # working/GNN-HIV-Challenge-2/starter_code/data_loader.py
+import os
+os.environ['OUTDATED_IGNORE'] = '1'
 import torch
 import torch_geometric
 from ogb.graphproppred import PygGraphPropPredDataset
