@@ -4,7 +4,6 @@ import torch_geometric
 from ogb.graphproppred import PygGraphPropPredDataset
 from torch_geometric.loader import DataLoader
 
-# Fix for PyTorch 2.6+ security
 torch.serialization.add_safe_globals([
     torch_geometric.data.data.DataEdgeAttr, 
     torch_geometric.data.data.DataTensorAttr,
@@ -14,12 +13,9 @@ torch.serialization.add_safe_globals([
 ])
 
 def get_dataloaders(batch_size=32):
-    # Load the official dataset
     dataset = PygGraphPropPredDataset(name='ogbg-molhiv', root='datasets/')
-    
-    # Standardized NeurIPS Scaffold Split
     split_idx = dataset.get_idx_split()
-    
+
     train_loader = DataLoader(dataset[split_idx["train"]], batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(dataset[split_idx["test"]], batch_size=batch_size, shuffle=False)
