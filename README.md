@@ -1,5 +1,3 @@
-Bash
-cat << 'EOF' > README.md
 # 🧬 GNN HIV Challenge: The OGB Benchmark Edition
 
 [![OGB-Dataset](https://img.shields.io/badge/Dataset-ogbg--molhiv-red)](https://ogb.stanford.edu/docs/graphprop/#ogbg-molhiv)
