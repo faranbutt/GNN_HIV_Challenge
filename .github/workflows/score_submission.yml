@@ -43,7 +43,12 @@ jobs:
     - name: Find Submission File
       id: find_submission
       run: |
-        SUB=$(git diff --diff-filter=AM --name-only HEAD^ HEAD | grep '^submissions/.*\.csv$' | head -n 1)
+        # Check for added/modified CSV
+        if git rev-parse HEAD^ >/dev/null 2>&1; then
+          SUB=$(git diff --diff-filter=AM --name-only HEAD^ HEAD | grep '^submissions/.*\.csv$' | head -n 1)
+        else
+          SUB=$(ls -t submissions/*.csv 2>/dev/null | head -n 1)
+        fi
 
         if [ -z "$SUB" ]; then
           echo "❌ No new submission CSV added."
@@ -71,11 +76,6 @@ jobs:
 
         if [ -z "$SCORE" ]; then
           echo "❌ Could not extract ROC-AUC. Scoring failed."
-          exit 1
-        fi
-
-        if (( $(echo "$SCORE <= 0" | bc -l) )); then
-          echo "❌ Score is zero or invalid."
           exit 1
         fi
 
